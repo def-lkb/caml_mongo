@@ -1,11 +1,23 @@
-author: Kiyoto Tamura <owenestea@gmail.com>
+Author: Frederic Bour <frederic.bour(_)lakaban.net>
 
-I am slowly writing an OCaml driver for MongoDB, mainly as
-a learning experience. Any feedback is appreciated, and the
-code is in the Public Domain.
+Fork of caml_mongo by Kiyoto Tamura ( https://github.com/kiyoto/caml_mongo ).
+New code is licensed under MIT license, see LICENSE_MIT.txt .
 
-Right now, all I have is a bson de/serializer and a simple
-implementation of the Mongo Wire Protocol. The next logical
-step is to write a reasonabl interface so that the user can
-interact with the database without worrying about the
-underlying protocol. Also, I should add a test suite.
+This fork uses Lwt as its core : to provide concurrent requests, iterate through cursors, etc.
+It also implements some key mongo commands : authentication, runcommand, admincommand.
+
+The code is functional but is considered alpha quality.
+In particular, network failures are not checked.
+
+Original readme:
+  author: Kiyoto Tamura <owenestea@gmail.com>
+  
+  I am slowly writing an OCaml driver for MongoDB, mainly as
+  a learning experience. Any feedback is appreciated, and the
+  code is in the Public Domain.
+  
+  Right now, all I have is a bson de/serializer and a simple
+  implementation of the Mongo Wire Protocol. The next logical
+  step is to write a reasonabl interface so that the user can
+  interact with the database without worrying about the
+  underlying protocol. Also, I should add a test suite.
