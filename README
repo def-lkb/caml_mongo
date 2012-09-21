@@ -3,8 +3,8 @@ Author: Frederic Bour <frederic.bour(_)lakaban.net>
 Fork of caml_mongo by Kiyoto Tamura ( https://github.com/kiyoto/caml_mongo ).
 New code is licensed under MIT license, see LICENSE_MIT.txt .
 
-This fork uses Lwt as its core : to provide concurrent requests, iterate through cursors, etc.
-It also implements some key mongo commands : authentication, runcommand, admincommand.
+This fork uses Lwt at its core: to provide concurrent requests, iterate through cursors, etc.
+It also implements some key mongo commands: authentication, runcommand, admincommand.
 
 The code is functional but is considered alpha quality.
 In particular, network failures are not checked.
