@@ -26,4 +26,7 @@
   https://github.com/kiyoto/caml_mongo
 
 )* }}} *)
+
 module Raw = Mongo_raw
+module Bson = Bson
+module Bson_exp = Bson_exp

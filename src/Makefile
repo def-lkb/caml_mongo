@@ -10,7 +10,7 @@ OCAMLFIND=ocamlfind
 
 #
 
-MAIN_TARGETS = mongo.cmxa mongo.cma mongo.cmi mongo.a
+MAIN_TARGETS = mongo.cmxa mongo.cmxs mongo.cma mongo.a
 DOC = mongo.docdir/index.html 
 AUX_TARGETS = $(DOC)
 
@@ -30,7 +30,7 @@ $(MAIN_TARGETS) $(AUX_TARGETS)::
 doc: $(DOC)
 
 install: META $(MAIN_TARGETS) 
-	$(OCAMLFIND) install $(FIND_FLAGS) $(PKG) META $(foreach T,$(MAIN_TARGETS),_build/$(T))
+	$(OCAMLFIND) install $(FIND_FLAGS) $(PKG) META $(foreach T,$(MAIN_TARGETS),_build/$(T)) $(filter-out _build/myocamlbuild.cmi, $(wildcard _build/*.cmi))
 
 uninstall:
 	$(OCAMLFIND) remove $(FIND_FLAGS) $(PKG)
