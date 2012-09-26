@@ -4,3 +4,5 @@ requires    = "unix"
 
 archive(byte)   = "mongo.cma"
 archive(native) = "mongo.cmxa"
+archive(plugin,byte)   = "mongo.cma"
+archive(plugin,native) = "mongo.cmxs"
