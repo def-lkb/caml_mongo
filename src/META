@@ -1,6 +1,6 @@
 description = "Interface to MongoDB"
 version     = "0.0.1"
-requires    = "unix"
+requires    = "unix,lwt,lwt.unix"
 
 archive(byte)   = "mongo.cma"
 archive(native) = "mongo.cmxa"
