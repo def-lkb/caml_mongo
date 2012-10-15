@@ -305,7 +305,7 @@ let find_one conn ?skip ?proj ?sock ~coll doc =
     Lwt_stream.get
 
 let run_command conn ?sock ~db ?(args=[]) command =
-  find_one conn ?sock ~coll:(db ^ "$cmd") ((command, Bson.Int32 1l) :: args)
+  find_one conn ?sock ~coll:(db ^ ".$cmd") ((command, Bson.Int32 1l) :: args)
 
 let admin_command conn ?sock ?args =
   run_command conn ?sock ~db:"admin" ?args
@@ -322,7 +322,7 @@ let auth ~user ~pass ~db conn =
       | None -> raise_lwt (Invalid_argument "authentication")
       | Some nonce_doc ->
           begin
-            match List.assoc "nonce" nonce_doc with
+            match (try List.assoc "nonce" nonce_doc with Not_found -> Bson.Null) with
               | Bson.String nonce as b_nonce ->
                   begin
                     let key = pw_key ~nonce ~user ~pass in
