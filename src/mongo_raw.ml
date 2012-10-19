@@ -77,7 +77,7 @@ type t (* this is the connection pool *) = {
 
 type raw_cursor = {
   conn : t;
-  coll : string;
+  abs_coll : string;
   mutable remaining: int option; (* limit *)
   mutable reply : reply_body;
 }
@@ -159,7 +159,7 @@ module Communicate = struct
                       raise_lwt (Failure (Printf.sprintf "unknown request_id, response_to = %ld" header.response_to))
                   end
               | _ ->
-                  raise_lwt (Failure (Printf.sprintf "unexpected content")) 
+                  raise_lwt (Failure "unexpected content") 
     in
     loop ()
 
@@ -244,7 +244,7 @@ module Cursor = struct
     | cursor ->
         let batch, remaining = batch_size cursor.remaining in
         cursor.remaining <- remaining;
-        let msg = Message.getmore ~coll:cursor.coll
+        let msg = Message.getmore ~coll:cursor.abs_coll
           ~num_rtn:batch ~cursor_id:cursor.reply.cursor_id in
         lwt reply = use_pool_with_req cursor.conn
           (Communicate.send_and_receive_message msg)
@@ -267,48 +267,48 @@ module Cursor = struct
     (Lwt_stream.concat (Lwt_stream.from (fun () -> next_batch cursor)))
 end
 
-let update conn ?(upsert = false) ?(multi = false) ?sock ~coll ~query:selector update =
+let update conn ?(upsert = false) ?(multi = false) ?sock ~db ~coll ~query:selector update =
   let flags = match upsert, multi with
     | false, false -> 0l
     | true, false -> 1l
     | false, true -> 2l
     | true, true -> 3l in
-  let msg = Message.update ~coll:coll ~flags:flags 0l 
+  let msg = Message.update ~coll:(db ^ "." ^ coll) ~flags:flags 0l 
     ~selector:selector ~update:update in
   use_pool conn ?sock (Communicate.send_message msg)
 
-let insert conn ?sock ~coll docs =
+let insert conn ?sock ~db ~coll docs =
   match docs with
     | [] -> Lwt.return_unit
     | _ ->
-        let msg = Message.insert ~coll:coll ~docs:docs 0l in
+        let msg = Message.insert ~coll:(db ^ "." ^ coll) ~docs:docs 0l in
         use_pool conn ?sock (Communicate.send_message msg)
 
-let delete conn ?sock ~coll ?(mode = `All) selector =
+let delete conn ?sock ~db ~coll ?(mode = `All) selector =
   let flags = (function `All -> 0l | `One -> 1l) mode in
-  let msg = Message.delete ~coll:coll ~flags:flags ~selector 0l  in
+  let msg = Message.delete ~coll:(db ^ "." ^ coll) ~flags:flags ~selector 0l  in
   use_pool conn ?sock (Communicate.send_message msg)
 
-let find conn ?limit ?(skip=0) ?(proj = []) ?sock ~coll selector =
+let find conn ?limit ?(skip=0) ?(proj = []) ?sock ~db ~coll selector =
   let batch, remaining = batch_size limit in
   let msg = Message.query ~proj
-    ~coll:coll ~query:selector ~flags:0l
+    ~coll:(db ^ "." ^ coll) ~query:selector ~flags:0l
     ~num_skip:(Int32.of_int skip) ~num_rtn:batch in
   lwt reply = use_pool_with_req ?sock conn
     (Communicate.send_and_receive_message msg)
   in
-  Lwt.return (Cursor.to_stream (Cursor.make_gcable { conn ; coll ; remaining ; reply }))
+  Lwt.return (Cursor.to_stream (Cursor.make_gcable { conn ; abs_coll = (db ^ "." ^ coll); remaining ; reply }))
 
-let find_one conn ?skip ?proj ?sock ~coll doc =
+let find_one conn ?skip ?proj ?sock ~db ~coll doc =
   Lwt.bind
-    (find conn ?skip ~limit:1 ?proj ?sock ~coll doc)
+    (find conn ?skip ~limit:1 ?proj ?sock ~db ~coll doc)
     Lwt_stream.get
 
-let run_command conn ?sock ~db ?(args=[]) command =
-  find_one conn ?sock ~coll:(db ^ ".$cmd") ((command, Bson.Int32 1l) :: args)
+let run_command conn ?sock ~db command ?(arg=Bson.Int32 1l) rest =
+  find_one conn ?sock ~db ~coll:"$cmd" ((command, arg) :: rest)
 
-let admin_command conn ?sock ?args =
-  run_command conn ?sock ~db:"admin" ?args
+let admin_command conn ?sock =
+  run_command conn ?sock ~db:"admin"
 
 let pw_hash ~user ~pass =
   Digest.to_hex (Digest.string (user ^ ":mongo:" ^ pass))
@@ -318,28 +318,47 @@ let pw_key ~nonce ~user ~pass =
     
 let auth ~user ~pass ~db conn =
   let auth' sock =
-    match_lwt (run_command conn ~sock ~db "getnonce") with
-      | None -> raise_lwt (Invalid_argument "authentication")
+    let error = Invalid_argument "authentication" in
+    match_lwt (run_command conn ~sock ~db "getnonce" []) with
+      | None -> raise_lwt error
       | Some nonce_doc ->
           begin
             match (try List.assoc "nonce" nonce_doc with Not_found -> Bson.Null) with
               | Bson.String nonce as b_nonce ->
                   begin
                     let key = pw_key ~nonce ~user ~pass in
-	            match_lwt (run_command conn ~sock ~db
-       			              ~args:[ "user", Bson.String user
-       			                    ; "nonce", b_nonce
-       			                    ; "key", Bson.String key
-       			                    ]
-                                      "authenticate")
+	            match_lwt (run_command conn ~sock ~db "authenticate"
+       			         [ "user", Bson.String user
+       			         ; "nonce", b_nonce
+       			         ; "key", Bson.String key
+       			         ])
                     with
-                      | None -> raise_lwt (Invalid_argument "authentication") 
+                      | None -> raise_lwt error 
                       | Some result ->
                           match List.assoc "ok" result with
                             | Bson.Double 1. -> Lwt.return_unit
-                            | _ -> raise_lwt (Invalid_argument "authentication")
+                            | _ -> raise_lwt error
                   end
-              | _ -> raise_lwt (Invalid_argument "authentication")
+              | _ -> raise_lwt error
           end
   in
   with_socket_init auth' conn
+
+let count conn ?limit ?(skip=0) ?sock ~db ~coll sel =
+  let limit = match limit with
+    | None -> []
+    | Some l -> ["limit", Bson.Int64 (Int64.of_int l)]
+  in
+  let query =
+    [ "query", Bson.Document sel
+    ; "skip", Bson.Int64 (Int64.of_int skip)
+    ] @ limit
+  in
+  match_lwt run_command conn ?sock ~db "count" ~arg:(Bson.String coll) query with
+    | None     -> raise_lwt (Failure "count: no response")
+    | Some doc ->
+        match List.assoc "n" doc with
+          | Bson.Int32 i -> Lwt.return (Int32.to_int i)
+          | Bson.Int64 i -> Lwt.return (Int64.to_int i)
+          | Bson.Double d -> Lwt.return (int_of_float d)
+          | _ -> raise_lwt (Failure "count: invalid 'n' field in response")

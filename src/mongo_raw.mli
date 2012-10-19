@@ -39,28 +39,28 @@ val connect :
 val with_socket_init : (socket -> unit Lwt.t) -> t -> t
 
 val update :
-  t -> ?upsert:bool -> ?multi:bool -> ?sock:socket -> coll:string ->
+  t -> ?upsert:bool -> ?multi:bool -> ?sock:socket -> db:string -> coll:string ->
   query:Bson.document -> Bson.document -> unit Lwt.t
 
 val insert :
-  t -> ?sock:socket -> coll:string -> Bson.document list -> unit Lwt.t
+  t -> ?sock:socket -> db:string -> coll:string -> Bson.document list -> unit Lwt.t
 
 val delete :
-  t -> ?sock:socket -> coll:string -> ?mode:delete_option -> Bson.document -> unit Lwt.t
+  t -> ?sock:socket -> db:string -> coll:string -> ?mode:delete_option -> Bson.document -> unit Lwt.t
 
 (* there are actually many options on find, but for now I am ignoring
  * all of them *)
 val find :
   t -> ?limit:int -> ?skip:int -> ?proj:Bson.document ->
-  ?sock:socket -> coll:string -> Bson.document -> cursor Lwt.t
+  ?sock:socket -> db:string -> coll:string -> Bson.document -> cursor Lwt.t
 
 val find_one :
   t -> ?skip:int -> ?proj:Bson.document -> 
-  ?sock:socket -> coll:string -> Bson.document -> Bson.document option Lwt.t
+  ?sock:socket -> db:string -> coll:string -> Bson.document -> Bson.document option Lwt.t
 
-val run_command : t -> ?sock:socket -> db:string -> ?args:Bson.document -> string -> Bson.document option Lwt.t
+val run_command : t -> ?sock:socket -> db:string -> string -> ?arg:Bson.value -> Bson.document -> Bson.document option Lwt.t
 
-val admin_command : t -> ?sock:socket -> ?args:Bson.document -> string -> Bson.document option Lwt.t
+val admin_command : t -> ?sock:socket -> string -> ?arg:Bson.value -> Bson.document -> Bson.document option Lwt.t
 
 (* authentication *)
 
@@ -68,3 +68,7 @@ val pw_hash : user:string -> pass:string -> string
 val pw_key  : nonce:string -> user:string -> pass:string -> string
 
 val auth : user:string -> pass:string -> db:string -> t -> t
+
+(* count *)
+
+val count : t -> ?limit:int -> ?skip:int -> ?sock:socket -> db:string -> coll:string -> Bson.document -> int Lwt.t
